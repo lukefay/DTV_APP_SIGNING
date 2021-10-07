@@ -56,20 +56,6 @@ def process_certs(certificates: str, password: str):
     root_cert = caP12[2][1].public_bytes(Encoding.PEM)
     
     return caP12
-    
-    # To create the certificate chain for -CAfile element in openssl command
-    # >> cat root_cert.pem issuer_cert.pem > bundle.pem
-    #
-    # OpenSSL command to read a certificate
-    # >> openssl x509 -in author_cert.pem -noout -text
-    #
-    # OpenSSL command to read a signature
-    # >> openssl cms -cmsout -in test_signature.p7s -noout -print
-    #
-    # OpenSSL command to check OCSP response:
-    # >> openssl ocsp -issuer issuer_cert.pem -cert author_cert.pem -CAfile bundle.pem -url http://pki-ocsp.nextgentvtrust.com/signing
-    # >> openssl ocsp -issuer issuer_cert.pem -cert author_cert.pem -noverify -no_nonce -url http://pki-ocsp.nextgentvtrust.com/signing -header Host=pki-ocsp.nextgentvtrust.com -text
-    
 
 def get_ocsp_server(cert):
     aia = cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_INFORMATION_ACCESS).value
@@ -78,44 +64,20 @@ def get_ocsp_server(cert):
         raise Exception(f'no ocsp server entry in AIA')
     return ocsps[0].access_location.value
 
-def get_oscp_request(ocsp_server, cert, issuer_cert):
-    builder = ocsp.OCSPRequestBuilder()
-    builder = builder.add_certificate(cert, issuer_cert, SHA256())
-    req = builder.build()
-    req_path = base64.b64encode(req.public_bytes(serialization.Encoding.DER))
-    return urljoin(ocsp_server + '/', req_path.decode('ascii'))
-    
-
-def get_ocsp_cert_status(ocsp_server, cert, issuer_cert):
-    ocsp_resp = requests.get(get_oscp_request(ocsp_server, cert, issuer_cert))
-    if ocsp_resp.ok:
-        ocsp_decoded = ocsp.load_der_ocsp_response(ocsp_resp.content)
-        if ocsp_decoded.response_status == OCSPResponseStatus.SUCCESSFUL:
-            return ocsp_decoded.certificate_status
-        else:
-            raise Exception(f'decoding ocsp response failed: {ocsp_decoded.response_status}')
-    raise Exception(f'fetching ocsp cert status failed with response status: {ocsp_resp.status_code}')
-
-#def image_to_byte_array(image:Image):
-#    imgByteArr = io.BytesIO()
-#    image.save(imgByteArr, format=image.format)
-#    imgByteArr = imgByteArr.getvalue()
-#    return imgByteArr
-    
 def readzip(source_file: str, dest_file: str, imageList: list):
     """
     Extract the name of the file, information list showing directory structure and filenames
-
+    
     Parameters
     ----------
     source_file
         The path to the source file to be read
-
+    
     Returns
     -------
         The information
     """
-
+    
     # create the file structure
     metadataEnvelope = etree.Element('metadataEnvelope')
     metadataEnvelope.set('xmlns','urn:3gpp:metadata:2005:MBMS:envelope')
@@ -153,7 +115,7 @@ def readzip(source_file: str, dest_file: str, imageList: list):
         item.set('contentLength',str(info.file_size))
         #item.tail='\r'
         #etree.dump(item)
-
+    
     # create a new XML file with the results
     #mydata = etree.tostring(metadataEnvelope, encoding="utf-8")
     mydata = minidom.parseString(etree.tostring(metadataEnvelope)).toprettyxml(encoding="UTF-8", indent="    ")
@@ -164,7 +126,7 @@ def readzip(source_file: str, dest_file: str, imageList: list):
     outer = MIMEMultipart('related')
     del(outer['mime-version'])
     outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
-
+    
     # Create the envelope
     part = MIMEApplication(mydata, _subtype='mbms-envelope+xml', _encoder=encoders.encode_noop)
     part.add_header('Content-Location', 'envelope.xml')
@@ -213,7 +175,7 @@ def readzip(source_file: str, dest_file: str, imageList: list):
     composed = outer.as_bytes(policy=msg.policy.clone(linesep="\r\n"))
     #composed = outer.as_bytes().replace(b'\n', b'\r\n')
     #composed = outer.as_bytes()
-
+    
     #if args.output:
     with open(dest_file, 'wb', buffering=0) as fp:
         #gen=generator.BytesGenerator(fp)
@@ -232,11 +194,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Script that converts a DOS like file to an Unix like file",
     )
-
+    
     # Add the arguments:
     #   - app_file: the app file we want to S/MIME package and sign
     #   - package_file: the output destination where signed package should go
-
+    
     # Note: the use of the argument type of argparse.FileType could
     # streamline some things
     parser.add_argument(
@@ -263,23 +225,23 @@ if __name__ == "__main__":
         help='Password to unlock the certificates file',
         default=None
     )
-
+    
     # Parse the args (argparse automatically grabs the values from
     # sys.argv)
     args = parser.parse_args()
-
+    
     s_file = args.app_file
     d_file = args.package_file
     ac_file = args.author_certs
     dc_file = args.distributor_certs
     p_file = args.pswd
-
+    
     # If the destination file wasn't passed, then assume we want to
     # create a new file based on the old one
     if d_file is None:
         file_path, file_extension = os.path.splitext(s_file)
         d_file = f'{file_path}_end{file_extension}'
-
+    
     file_path, file_extension = os.path.splitext(s_file)
     tmp_file = f'{file_path}_tmp{file_extension}'
     imageList=[]
@@ -406,7 +368,7 @@ if __name__ == "__main__":
     crlreply = ocsp.OCSPResponse()
     crlreply['response_status']=au_ocsp_status.response_status.value
     crlreply['response_bytes']=ocsp.ResponseBytes.load(au_resp_data)
-#    sd['crls'] = [crlreply]
+    #sd['crls'] = [crlreply]
     
     # Adding Certificate Revocation List (CRL) - METHOD 2
     crlist = cms.OtherRevocationInfoFormat()
@@ -528,7 +490,7 @@ if __name__ == "__main__":
     crlreply = ocsp.OCSPResponse()
     crlreply['response_status']=dt_ocsp_status.response_status.value
     crlreply['response_bytes']=ocsp.ResponseBytes.load(dt_resp_data)
-#    sd['crls'] = [crlreply]
+    #sd['crls'] = [crlreply]
     
     # Adding Certificate Revocation List (CRL) - METHOD 2
     crlist = cms.OtherRevocationInfoFormat()
