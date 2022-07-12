@@ -351,7 +351,7 @@ if __name__ == "__main__":
     #sd = cms.SignedAndEnvelopedData()
     
     # Populating some of its field
-    sd['version']='v3'
+    sd['version']='v5'
     #sd['encap_content_info']=util.OrderedDict([ ('content_type', 'data'), ('content', buf.read()) ])
     sd['encap_content_info']=util.OrderedDict([ ('content_type', 'data'), ('content', b'dummy') ])
     sd['digest_algorithms']=[ util.OrderedDict([ ('algorithm', 'sha256'), ('parameters', None) ]) ]
@@ -363,11 +363,15 @@ if __name__ == "__main__":
     # Adding this certificate to SignedData object
     sd['certificates'] = [cert]
     
+    # Add CRL Info Choice
+    crlchoice = cms.RevocationInfoChoices()
+    #crlchoice['RevocationInfoChoice']='1.3.6.1.5.5.7.16.2'
+    
     # put OCSP response into CMS structure as OtherRevocationInfoFormat (OID = 1.3.6.1.5.5.7.16.2)
     # Adding Certificate Revocation List (CRL) - METHOD 1
     crlreply = ocsp.OCSPResponse()
     crlreply['response_status']=au_ocsp_status.response_status.value
-    crlreply['response_bytes']=ocsp.ResponseBytes.load(au_resp_data)
+    crlreply['response_bytes']=ocsp.ResponseBytes.load(au_ocsp_status.public_bytes(Encoding.DER))
     #sd['crls'] = [crlreply]
     
     # Adding Certificate Revocation List (CRL) - METHOD 2
@@ -378,12 +382,13 @@ if __name__ == "__main__":
     
     # Adding Certificate Revocation List (CRL) - METHOD 3
     #ocspreply = cms.RevocationInfoChoices.load(au_resp_data, strict=False, tag=16)
+    ocspreply = cms.RevocationInfoChoices.load(au_ocsp_status.public_bytes(Encoding.DER), strict=False, tag=16)
     #sd['crls'] = [ocspreply]
     
     # Setting signer info section
     signer_info = cms.SignerInfo()
     #signer_info['version']=cms_version
-    signer_info['version']='v3'
+    signer_info['version']='v5'
     signer_info['digest_algorithm']=util.OrderedDict([('algorithm', 'sha256'), ('parameters', None) ])
     signer_info['signature_algorithm']=util.OrderedDict([('algorithm', 'sha256_rsa'), ('parameters', None) ])
     
@@ -397,10 +402,12 @@ if __name__ == "__main__":
             buf.write(line)
     
     #ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer author_cert.pem -inkey author_key.pem -out test_data.cms -outform PEM'
-    ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer author_cert.pem -inkey author_key.pem -outform PEM'
+    ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer author_cert.pem -inkey author_key.pem -out au_sign.der -outform DER'
     sign_cmd = openssl_location + " " + ossl_cmd
     #signing = subprocess.check_output(sign_cmd, shell=True)
-    signer_info['signature'] = subprocess.check_output(sign_cmd, shell=True)
+    with open('au_sign.der', 'rb') as au_sign:
+        au_signature = au_sign.read()
+    signer_info['signature'] = au_signature
     
     # Finding subject_key_identifier from certificate (asn1crypto.x509 object)
     key_id = cert.key_identifier_value.native
@@ -473,7 +480,7 @@ if __name__ == "__main__":
     #sd = cms.SignedAndEnvelopedData()
     
     # Populating some of its field
-    sd['version']='v3'
+    sd['version']='v5'
     #sd['encap_content_info']=util.OrderedDict([ ('content_type', 'data'), ('content', buf.read()) ])
     sd['encap_content_info']=util.OrderedDict([ ('content_type', 'data'), ('content', b'dummy') ])
     sd['digest_algorithms']=[ util.OrderedDict([ ('algorithm', 'sha256'), ('parameters', None) ]) ]
@@ -489,7 +496,8 @@ if __name__ == "__main__":
     # Adding Certificate Revocation List (CRL) - METHOD 1
     crlreply = ocsp.OCSPResponse()
     crlreply['response_status']=dt_ocsp_status.response_status.value
-    crlreply['response_bytes']=ocsp.ResponseBytes.load(dt_resp_data)
+    #crlreply['response_bytes']=ocsp.ResponseBytes.load(dt_resp_data)
+    crlreply['response_bytes']=ocsp.ResponseBytes.load(dt_ocsp_status.public_bytes(Encoding.DER))
     #sd['crls'] = [crlreply]
     
     # Adding Certificate Revocation List (CRL) - METHOD 2
@@ -505,7 +513,7 @@ if __name__ == "__main__":
     # Setting signer info section
     signer_info = cms.SignerInfo()
     #signer_info['version']=cms_version
-    signer_info['version']='v3'
+    signer_info['version']='v5'
     signer_info['digest_algorithm']=util.OrderedDict([('algorithm', 'sha256'), ('parameters', None) ])
     signer_info['signature_algorithm']=util.OrderedDict([('algorithm', 'sha256_rsa'), ('parameters', None) ])
     
@@ -519,7 +527,7 @@ if __name__ == "__main__":
             buf.write(line)
     
     #ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer distrib_cert.pem -inkey distrib_key.pem -out test_data.cms -outform PEM'
-    ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer distrib_cert.pem -inkey distrib_key.pem -outform PEM'
+    ossl_cmd = 'cms -sign -binary -in data.txt -md sha256 -signer distrib_cert.pem -inkey distrib_key.pem -outform DER'
     sign_cmd = openssl_location + " " + ossl_cmd
     #signing = subprocess.check_output(sign_cmd, shell=True)
     signer_info['signature'] = subprocess.check_output(sign_cmd, shell=True)
